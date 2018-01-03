@@ -8,6 +8,8 @@ import org.apache.storm.tuple.Fields;
 import org.apache.storm.tuple.Values;
 
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * locate com.basic
@@ -17,6 +19,7 @@ public class SentencesSpout extends BaseRichSpout{
 
     private  SpoutOutputCollector outputCollector;
 
+    private ConcurrentHashMap<UUID,Values> pending; //用来记录tuple的msgID，和tuple
 
     @Override
     public void declareOutputFields(OutputFieldsDeclarer outputFieldsDeclarer) {
@@ -26,6 +29,7 @@ public class SentencesSpout extends BaseRichSpout{
     @Override
     public void open(Map map, TopologyContext topologyContext, SpoutOutputCollector spoutOutputCollector) {
         this.outputCollector=spoutOutputCollector;
+        this.pending=new ConcurrentHashMap<UUID, Values>();
     }
 
     @Override
@@ -35,17 +39,21 @@ public class SentencesSpout extends BaseRichSpout{
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        outputCollector.emit(new Values("i love xxxx"),"tanjie");
+        Values value = new Values(new Values("i love xxxx"));
+        UUID uuid=UUID.randomUUID();
+        pending.put(uuid,value);
+        outputCollector.emit(value,uuid);
     }
 
     @Override
     public void ack(Object msgId) {
         System.out.println("ack: "+msgId);
+        pending.remove(msgId);
     }
 
     @Override
     public void fail(Object msgId) {
         System.err.println("fail"+msgId);
-        outputCollector.emit(new Values("i love xxxx"),"fail tanjie");
+        outputCollector.emit(pending.get(msgId),msgId);
     }
 }
